@@ -13,7 +13,7 @@ const TitleBar = ({ title, onAddWorkspace, onBack, onAddFlashcard }) => {
       <Container>
         <Navbar.Brand onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <Image src={logo} alt="Logo" width="40" height="40" className="d-inline-block align-top me-2" />
-          {isVaultPage ? title : 'Flashcard Revisions'}
+          {'Flashcard Revisions'}
         </Navbar.Brand>
 
         <div>

@@ -2,14 +2,7 @@ import React from 'react';
 import { Card, Button } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 
-const WorkspaceCard = ({ workspace,onDelete }) => {
-  const handleDelete = () => {
-    const isConfirmed = window.confirm(`Are you sure you want to delete "${workspace.title}"?`);
-    if (isConfirmed) {
-      onDelete(workspace.id);  // ✅ Only delete if confirmed
-    }
-  };
- 
+const WorkspaceCard = ({ workspace, onDelete }) => {
   const navigate = useNavigate();
 
   return (
@@ -24,7 +17,7 @@ const WorkspaceCard = ({ workspace,onDelete }) => {
             onClick={() => navigate(`/vault/${workspace.id}`)}> 
             Enter Workspace
           </Button>
-          <Button variant="danger" onClick={handleDelete}>❌</Button>
+          <Button variant="danger" onClick={() => onDelete(workspace.id)}>❌</Button>
         </div>
       </Card.Body>
     </Card>
