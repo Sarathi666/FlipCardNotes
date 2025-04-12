@@ -1,25 +1,17 @@
-// filepath: server/server.js
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();
+const dotenv = require('dotenv');
+const connectDB = require('./config/db');
+
+dotenv.config();
+connectDB();
 
 const app = express();
-
-// Middleware
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
 
-// Routes
-app.get('/', (req, res) => {
-    res.send('API is running...');
-});
+app.use('/api/workspaces', require('./routes/workspaces'));
+app.use('/api/flashcards', require('./routes/flashcards'));
 
-// Connect to MongoDB
 const PORT = process.env.PORT || 5000;
-mongoose
-    .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => {
-        app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-    })
-    .catch((err) => console.error(err));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
