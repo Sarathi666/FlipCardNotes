@@ -1,85 +1,73 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Modal, Button } from 'react-bootstrap';
+import axios from 'axios';
+
 import TitleBar from '../components/TitleBar';
 import Flashcard from '../components/Flashcard';
 import FlashcardForm from '../components/FlashcardForm';
 
-const Vault = ({ workspaces, setWorkspaces }) => {
+const Vault = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [currentWorkspace, setCurrentWorkspace] = useState(null);
+  const [flashcards, setFlashcards] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
-
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [cardIdToDelete, setCardIdToDelete] = useState(null);
 
   useEffect(() => {
-    const ws = workspaces.find((w) => w.id === parseInt(id));
-    if (ws) setCurrentWorkspace(ws);
+    fetchWorkspace();
+    fetchFlashcards();
+
     const handleKeyDown = (e) => {
-      // Check for Enter and that no input is focused
-      if (e.key === 'Enter' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-        e.preventDefault();  // Optional: prevent default scrolling
+      if (e.key === 'Enter' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+        e.preventDefault();
         setEditingCard(null);
         setShowForm(true);
       }
     };
-  
+
     window.addEventListener('keydown', handleKeyDown);
-  
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [id]);
 
-  }, [id, workspaces]);
+  const fetchWorkspace = async () => {
+    const res = await axios.get('/api/workspaces');
+    const workspace = res.data.find(w => w._id === id);
+    setCurrentWorkspace(workspace);
+  };
 
-  const handleSaveFlashcard = (question, answer, cardId = null) => {
-    if (!currentWorkspace) return;
+  const fetchFlashcards = async () => {
+    const res = await axios.get(`/api/flashcards/${id}`);
+    setFlashcards(res.data);
+  };
 
-    let updatedCards;
-
+  const handleSaveFlashcard = async (question, answer, cardId = null) => {
     if (cardId) {
-      updatedCards = currentWorkspace.cards.map((card) =>
-        card.id === cardId ? { ...card, question, answer } : card
-      );
+      await axios.put(`/api/flashcards/${cardId}`, { question, answer });
     } else {
-      const newCard = { id: Date.now(), question, answer };
-      updatedCards = [...(currentWorkspace.cards || []), newCard];
+      await axios.post(`/api/flashcards`, {
+        question,
+        answer,
+        workspaceId: id,
+      });
     }
-
-    const updatedWorkspace = { ...currentWorkspace, cards: updatedCards };
-
-    const updatedWorkspaces = workspaces.map((ws) =>
-      ws.id === currentWorkspace.id ? updatedWorkspace : ws
-    );
-
-    setWorkspaces(updatedWorkspaces);
-    setCurrentWorkspace(updatedWorkspace);
+    fetchFlashcards();
     setShowForm(false);
     setEditingCard(null);
   };
 
-  // 🚨 New function to trigger the modal
   const confirmDeleteCard = (cardId) => {
     setCardIdToDelete(cardId);
     setShowDeleteModal(true);
   };
 
-  // 🧹 Cleanup and delete after confirmation
-  const handleConfirmDelete = () => {
-    const updatedCards = currentWorkspace.cards.filter((card) => card.id !== cardIdToDelete);
-    const updatedWorkspace = { ...currentWorkspace, cards: updatedCards };
-    const updatedWorkspaces = workspaces.map((ws) =>
-      ws.id === currentWorkspace.id ? updatedWorkspace : ws
-    );
-
-    setWorkspaces(updatedWorkspaces);
-    setCurrentWorkspace(updatedWorkspace);
-    setShowForm(false);
-    setEditingCard(null);
+  const handleConfirmDelete = async () => {
+    await axios.delete(`/api/flashcards/${cardIdToDelete}`);
+    fetchFlashcards();
     setShowDeleteModal(false);
     setCardIdToDelete(null);
   };
@@ -102,7 +90,6 @@ const Vault = ({ workspaces, setWorkspaces }) => {
       <Container className="mt-4">
         <h1>{currentWorkspace?.title}</h1>
 
-        {/* ✅ Reference Section for PDF Preview */}
         {currentWorkspace?.book?.url && (
           <div className="mb-4">
             <h5>Reference</h5>
@@ -138,14 +125,14 @@ const Vault = ({ workspaces, setWorkspaces }) => {
         )}
 
         <Row>
-          {currentWorkspace?.cards?.length > 0 ? (
-            currentWorkspace.cards.map((card) => (
-              <Col key={card.id} md={4}>
+          {flashcards.length > 0 ? (
+            flashcards.map((card) => (
+              <Col key={card._id} md={4}>
                 <Flashcard
                   question={card.question}
                   answer={card.answer}
-                  onEdit={() => handleEditCard(card)}
-                  onDelete={() => confirmDeleteCard(card.id)} // 🔁 use new modal trigger
+                  onEdit={() => handleEditCard({ ...card, id: card._id })}
+                  onDelete={() => confirmDeleteCard(card._id)}
                 />
               </Col>
             ))
@@ -166,21 +153,14 @@ const Vault = ({ workspaces, setWorkspaces }) => {
           />
         )}
 
-        {/* 🧼 Delete Confirmation Modal */}
         <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
           <Modal.Header closeButton>
             <Modal.Title>Confirm Deletion</Modal.Title>
           </Modal.Header>
-          <Modal.Body>
-            Are you sure you want to delete this flashcard? This action cannot be undone.
-          </Modal.Body>
+          <Modal.Body>Are you sure you want to delete this flashcard?</Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={handleConfirmDelete}>
-              Delete
-            </Button>
+            <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+            <Button variant="danger" onClick={handleConfirmDelete}>Delete</Button>
           </Modal.Footer>
         </Modal>
       </Container>
