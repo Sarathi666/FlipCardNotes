@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const authRoutes = require('./routes/auth');
 
 dotenv.config();
 connectDB();
@@ -12,6 +13,8 @@ app.use(express.json());
 
 app.use('/api/workspaces', require('./routes/workspaces'));
 app.use('/api/flashcards', require('./routes/flashcards'));
+app.use('/api/auth', require('./routes/auth'));
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
