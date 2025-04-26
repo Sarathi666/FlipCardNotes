@@ -18,6 +18,7 @@ const Vault = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [cardIdToDelete, setCardIdToDelete] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfError, setPdfError] = useState(null);
 
   useEffect(() => {
     fetchWorkspace();
@@ -34,8 +35,7 @@ const Vault = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      // Cleanup URL object when component unmounts
-      if (pdfUrl) {
+      if (pdfUrl && pdfUrl.startsWith('blob:')) {
         URL.revokeObjectURL(pdfUrl);
       }
     };
@@ -55,17 +55,28 @@ const Vault = () => {
         }
       });
       const workspace = res.data.find(w => w._id === id);
-      
-      if (workspace && workspace.book?.file) {
-        // Create a new Blob from the file data
-        const blob = new Blob([workspace.book.file], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
-      } else if (workspace && workspace.book?.url) {
-        setPdfUrl(workspace.book.url);
-      }
-      
       setCurrentWorkspace(workspace);
+      
+      if (workspace && workspace.book) {
+        try {
+          // Get the PDF data from our backend
+          const pdfResponse = await axios.get(`/api/workspaces/${id}/pdf`, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            responseType: 'blob' // Important: we want a binary response
+          });
+          
+          // Create a blob URL from the PDF data
+          const blob = new Blob([pdfResponse.data], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          setPdfUrl(url);
+          setPdfError(null);
+        } catch (pdfError) {
+          console.error('Error fetching PDF:', pdfError);
+          setPdfError('Failed to load PDF. Please try refreshing the page.');
+        }
+      }
     } catch (error) {
       console.error('Error fetching workspace:', error);
       if (error.response?.status === 401) {
@@ -179,6 +190,12 @@ const Vault = () => {
       <Container className="mt-4">
         <h1>{currentWorkspace?.title}</h1>
 
+        {pdfError && (
+          <div className="alert alert-danger mb-4" role="alert">
+            {pdfError}
+          </div>
+        )}
+
         {pdfUrl && (
           <div className="mb-4">
             <h5>Reference</h5>
@@ -192,15 +209,24 @@ const Vault = () => {
                 height: '500px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               }}
-              onClick={() => window.open(pdfUrl, '_blank')}
             >
-              <iframe
-                src={pdfUrl}
-                title="Reference Preview"
+              <object
+                data={pdfUrl}
+                type="application/pdf"
                 width="100%"
                 height="100%"
                 style={{ border: 'none' }}
-              />
+              >
+                <iframe
+                  src={pdfUrl}
+                  title="Reference Preview"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 'none' }}
+                >
+                  <p>Your browser doesn't support PDF preview.</p>
+                </iframe>
+              </object>
             </div>
             <div className="mt-2 text-end">
               <button

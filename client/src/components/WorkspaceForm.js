@@ -33,21 +33,41 @@ const WorkspaceForm = ({
     setError(null);
 
     try {
+      console.log('Starting workspace submission...');
+      let bookData = null;
+      
+      if (book) {
+        console.log('Processing book data:', {
+          name: book.name,
+          dataLength: book.data ? book.data.length : 0
+        });
+
+        bookData = {
+          name: book.name,
+          data: book.data
+        };
+
+        // Validate the base64 data
+        if (!bookData.data || !bookData.data.startsWith('data:application/pdf;base64,')) {
+          console.error('Invalid PDF data format');
+          throw new Error('Invalid PDF data format');
+        }
+      }
+
       const workspaceData = {
         id: workspaceId || Date.now(),
         title: title.trim(),
         description: description.trim(),
-        book: book ? {
-          name: book.name,
-          url: book.url
-        } : null
+        book: bookData
       };
 
+      console.log('Sending workspace data to server...');
       await onSave(workspaceData);
+      console.log('Workspace saved successfully');
       onClose();
     } catch (error) {
-      console.error('Error saving workspace:', error);
-      setError('Failed to save workspace. Please try again.');
+      console.error('Error in handleSubmit:', error);
+      setError(error.message || 'Failed to save workspace. Please try again with a different PDF file.');
     } finally {
       setIsSubmitting(false);
     }
@@ -57,27 +77,55 @@ const WorkspaceForm = ({
     const file = e.target.files[0];
     if (!file) return;
 
+    console.log('File selected:', {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    });
+
     if (file.type !== 'application/pdf') {
       alert('Please upload a valid PDF file.');
       return;
     }
 
-    // Check file size (limit to 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File size should be less than 10MB.');
+    // Increased size limit to 50MB
+    if (file.size > 50 * 1024 * 1024) {
+      alert('File size should be less than 50MB.');
       return;
     }
 
     try {
-      const fileURL = URL.createObjectURL(file);
-      setBook({
-        name: file.name,
-        url: fileURL,
-        file: file
-      });
+      // Create a FileReader to read the file as base64
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          console.log('File read successfully, creating URL...');
+          const fileURL = URL.createObjectURL(file);
+          const fileData = e.target.result;
+          console.log('File data length:', fileData.length);
+          
+          setBook({
+            name: file.name,
+            url: fileURL,
+            data: fileData
+          });
+          console.log('Book state updated successfully');
+        } catch (error) {
+          console.error('Error in reader.onload:', error);
+          alert('Error processing file. Please try a different PDF file.');
+        }
+      };
+
+      reader.onerror = (error) => {
+        console.error('FileReader error:', error);
+        alert('Error reading file. Please try a different PDF file.');
+      };
+
+      reader.readAsDataURL(file);
     } catch (error) {
-      console.error('Error processing file:', error);
-      alert('Error processing file. Please try again.');
+      console.error('Error in handleBookUpload:', error);
+      alert('Error processing file. Please try a different PDF file.');
     }
   };
 
