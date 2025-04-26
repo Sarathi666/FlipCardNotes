@@ -6,7 +6,14 @@ const WorkspaceSchema = new mongoose.Schema({
   book: {
     name: String,
     url: String,
+    data: Buffer,
+    contentType: String
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }
 });
 
 module.exports = mongoose.model('Workspace', WorkspaceSchema);
