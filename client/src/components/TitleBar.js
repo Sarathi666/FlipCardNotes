@@ -11,8 +11,23 @@ axios.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
+// Add response interceptor to handle token expiration
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 403) {
+      // Token expired or invalid
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/';
+    }
+    return Promise.reject(error);
+  }
+);
 
 const TitleBar = ({ title, onAddWorkspace, onBack, onAddFlashcard }) => {
   const navigate = useNavigate();
@@ -125,28 +140,77 @@ const handleRegister = async (e) => {
 
 const handleDeleteAccount = async () => {
   try {
-    // Show loading state or handle modal visibility
-    console.log('Deleting account...');
-    
-    // Send the delete request
-    await axios.delete('/api/auth/delete', {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found');
+      alert('You must be logged in to delete your account');
+      return;
+    }
+
+    // First verify the token is still valid
+    try {
+      await axios.get('/api/auth/verify', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+    } catch (verifyError) {
+      if (verifyError.response && verifyError.response.status === 403) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+        alert('Your session has expired. Please log in again.');
+        return;
+      }
+    }
+
+    const response = await axios.delete('/api/auth/delete', {
       headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`
+        Authorization: `Bearer ${token}`
       }
     });
 
-    // Clear localStorage and state
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);  // Ensure this updates the user state
-    setShowLogout(false); // If you have a logout modal or view
-    setShowDeleteConfirm(false); // Close the confirmation modal
-    setShowDeleteSuccess(true); // Trigger the success modal
+    if (response.status === 200) {
+      // Clear localStorage and state
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+      setShowLogout(false);
+      setShowDeleteConfirm(false);
+      setShowDeleteSuccess(true);
 
-    console.log('Account deleted, state updated');
+      // Navigate to home page after a short delay
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+    }
   } catch (err) {
     console.error('Account deletion failed:', err);
-    // Optionally show an error modal or toast
+    let errorMessage = 'Failed to delete account. ';
+    
+    if (err.response) {
+      switch (err.response.status) {
+        case 401:
+          errorMessage += 'You are not authorized. Please log in again.';
+          break;
+        case 403:
+          errorMessage += 'Your session has expired. Please log in again.';
+          // Clear user data on token expiration
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          break;
+        case 404:
+          errorMessage += 'Account not found.';
+          break;
+        default:
+          errorMessage += 'Please try again.';
+      }
+    } else {
+      errorMessage += 'Please check your internet connection and try again.';
+    }
+    
+    alert(errorMessage);
   }
 };
 
