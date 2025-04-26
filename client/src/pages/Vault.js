@@ -17,6 +17,7 @@ const Vault = () => {
   const [editingCard, setEditingCard] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [cardIdToDelete, setCardIdToDelete] = useState(null);
+  const [pdfUrl, setPdfUrl] = useState(null);
 
   useEffect(() => {
     fetchWorkspace();
@@ -31,33 +32,104 @@ const Vault = () => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      // Cleanup URL object when component unmounts
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
   }, [id]);
 
   const fetchWorkspace = async () => {
-    const res = await axios.get('/api/workspaces');
-    const workspace = res.data.find(w => w._id === id);
-    setCurrentWorkspace(workspace);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/');
+        return;
+      }
+
+      const res = await axios.get('/api/workspaces', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const workspace = res.data.find(w => w._id === id);
+      
+      if (workspace && workspace.book?.file) {
+        // Create a new Blob from the file data
+        const blob = new Blob([workspace.book.file], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+      } else if (workspace && workspace.book?.url) {
+        setPdfUrl(workspace.book.url);
+      }
+      
+      setCurrentWorkspace(workspace);
+    } catch (error) {
+      console.error('Error fetching workspace:', error);
+      if (error.response?.status === 401) {
+        navigate('/');
+      }
+    }
   };
 
   const fetchFlashcards = async () => {
-    const res = await axios.get(`/api/flashcards/${id}`);
-    setFlashcards(res.data);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/');
+        return;
+      }
+
+      const res = await axios.get(`/api/flashcards/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setFlashcards(res.data);
+    } catch (error) {
+      console.error('Error fetching flashcards:', error);
+      if (error.response?.status === 401) {
+        navigate('/');
+      }
+    }
   };
 
   const handleSaveFlashcard = async (question, answer, cardId = null) => {
-    if (cardId) {
-      await axios.put(`/api/flashcards/${cardId}`, { question, answer });
-    } else {
-      await axios.post(`/api/flashcards`, {
-        question,
-        answer,
-        workspaceId: id,
-      });
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/');
+        return;
+      }
+
+      if (cardId) {
+        await axios.put(`/api/flashcards/${cardId}`, { question, answer }, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      } else {
+        await axios.post(`/api/flashcards`, {
+          question,
+          answer,
+          workspaceId: id,
+        }, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      }
+      fetchFlashcards();
+      setShowForm(false);
+      setEditingCard(null);
+    } catch (error) {
+      console.error('Error saving flashcard:', error);
+      if (error.response?.status === 401) {
+        navigate('/');
+      }
     }
-    fetchFlashcards();
-    setShowForm(false);
-    setEditingCard(null);
   };
 
   const confirmDeleteCard = (cardId) => {
@@ -66,10 +138,27 @@ const Vault = () => {
   };
 
   const handleConfirmDelete = async () => {
-    await axios.delete(`/api/flashcards/${cardIdToDelete}`);
-    fetchFlashcards();
-    setShowDeleteModal(false);
-    setCardIdToDelete(null);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/');
+        return;
+      }
+
+      await axios.delete(`/api/flashcards/${cardIdToDelete}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      fetchFlashcards();
+      setShowDeleteModal(false);
+      setCardIdToDelete(null);
+    } catch (error) {
+      console.error('Error deleting flashcard:', error);
+      if (error.response?.status === 401) {
+        navigate('/');
+      }
+    }
   };
 
   const handleEditCard = (card) => {
@@ -90,7 +179,7 @@ const Vault = () => {
       <Container className="mt-4">
         <h1>{currentWorkspace?.title}</h1>
 
-        {currentWorkspace?.book?.url && (
+        {pdfUrl && (
           <div className="mb-4">
             <h5>Reference</h5>
             <div
@@ -103,10 +192,10 @@ const Vault = () => {
                 height: '500px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               }}
-              onClick={() => window.open(currentWorkspace.book.url, '_blank')}
+              onClick={() => window.open(pdfUrl, '_blank')}
             >
               <iframe
-                src={currentWorkspace.book.url}
+                src={pdfUrl}
                 title="Reference Preview"
                 width="100%"
                 height="100%"
@@ -116,7 +205,7 @@ const Vault = () => {
             <div className="mt-2 text-end">
               <button
                 className="btn btn-outline-primary"
-                onClick={() => window.open(currentWorkspace.book.url, '_blank')}
+                onClick={() => window.open(pdfUrl, '_blank')}
               >
                 Open in New Tab
               </button>

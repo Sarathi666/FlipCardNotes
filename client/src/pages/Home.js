@@ -1,98 +1,243 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Modal, Button } from 'react-bootstrap';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 import WorkspaceCard from '../components/WorkspaceCard';
 import TitleBar from '../components/TitleBar';
 import WorkspaceForm from '../components/WorkspaceForm';
 
 const Home = () => {
+  const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState(null);
   const [workspaceToDelete, setWorkspaceToDelete] = useState(null);
+  const [error, setError] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
+  // Check authentication and load workspaces on mount
   useEffect(() => {
-    fetchWorkspaces();
+    const loadWorkspaces = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setWorkspaces([]);
+        setIsLoggedIn(false);
+        return;
+      }
 
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-        e.preventDefault();
-        setEditingWorkspace(null);
-        setShowForm(true);
+      setIsLoggedIn(true);
+      try {
+        const res = await axios.get('/api/workspaces', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        setWorkspaces(res.data);
+      } catch (error) {
+        console.error('Error fetching workspaces:', error);
+        if (error.response?.status === 401) {
+          setWorkspaces([]);
+          setIsLoggedIn(false);
+          navigate('/');
+        } else {
+          setError('Failed to fetch workspaces. Please refresh the page.');
+        }
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    loadWorkspaces();
+  }, [navigate]);
+
+  // Add effect to check authentication status
+  useEffect(() => {
+    const checkAuth = () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setWorkspaces([]);
+        navigate('/');
+      }
+    };
+
+    // Check auth status every 5 seconds
+    const interval = setInterval(checkAuth, 5000);
+    return () => clearInterval(interval);
+  }, [navigate]);
 
   const fetchWorkspaces = async () => {
-    const res = await axios.get('/api/workspaces');
-    setWorkspaces(res.data);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setWorkspaces([]);
+        return;
+      }
+
+      const res = await axios.get('/api/workspaces', {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setWorkspaces(res.data);
+    } catch (error) {
+      console.error('Error fetching workspaces:', error);
+      if (error.response?.status === 401) {
+        setWorkspaces([]);
+        navigate('/');
+      } else {
+        setError('Failed to fetch workspaces. Please refresh the page.');
+      }
+    }
   };
 
   const handleSaveWorkspace = async (workspace) => {
-    if (editingWorkspace) {
-      await axios.put(`/api/workspaces/${workspace.id}`, workspace);
-    } else {
-      await axios.post('/api/workspaces', workspace);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/');
+        return;
+      }
+
+      let response;
+      
+      if (editingWorkspace) {
+        response = await axios.put(`/api/workspaces/${editingWorkspace._id}`, workspace, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      } else {
+        response = await axios.post('/api/workspaces', workspace, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      }
+
+      await fetchWorkspaces();
+      setShowForm(false);
+      setEditingWorkspace(null);
+    } catch (error) {
+      console.error('Error saving workspace:', error);
+      if (error.response?.status === 401) {
+        setWorkspaces([]);
+        navigate('/');
+      } else {
+        const errorMessage = error.response?.data?.message || 'Failed to save workspace. Please try again.';
+        throw new Error(errorMessage);
+      }
     }
-    fetchWorkspaces();
-    setShowForm(false);
-    setEditingWorkspace(null);
   };
 
   const handleRightClick = (e, workspace) => {
     e.preventDefault();
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/');
+      return;
+    }
     setEditingWorkspace(workspace);
     setShowForm(true);
   };
 
-  const confirmDelete = (id) => setWorkspaceToDelete(id);
+  const confirmDelete = (id) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/');
+      return;
+    }
+    setWorkspaceToDelete(id);
+  };
 
   const handleConfirmDelete = async () => {
-    await axios.delete(`/api/workspaces/${workspaceToDelete}`);
-    fetchWorkspaces();
-    setWorkspaceToDelete(null);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/');
+        return;
+      }
+
+      await axios.delete(`/api/workspaces/${workspaceToDelete}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      await fetchWorkspaces();
+      setWorkspaceToDelete(null);
+    } catch (error) {
+      console.error('Error deleting workspace:', error);
+      if (error.response?.status === 401) {
+        setWorkspaces([]);
+        navigate('/');
+      } else {
+        setError('Failed to delete workspace. Please try again.');
+      }
+    }
   };
 
   return (
     <>
       <TitleBar onAddWorkspace={() => { setEditingWorkspace(null); setShowForm(true); }} />
       <Container className="mt-4">
-        <h1>Your Workspaces</h1>
+        {isLoggedIn ? (
+          <>
+            <h1>Your Workspaces</h1>
 
-        {showForm && (
-          <WorkspaceForm
-            onSave={handleSaveWorkspace}
-            onClose={() => {
-              setShowForm(false);
-              setEditingWorkspace(null);
-            }}
-            initialTitle={editingWorkspace?.title || ''}
-            initialDescription={editingWorkspace?.description || ''}
-            initialBook={editingWorkspace?.book || null}
-            workspaceId={editingWorkspace?.id || null}
-          />
+            {error && (
+              <div className="alert alert-danger" role="alert">
+                {error}
+              </div>
+            )}
+
+            {showForm && (
+              <WorkspaceForm
+                onSave={handleSaveWorkspace}
+                onClose={() => {
+                  setShowForm(false);
+                  setEditingWorkspace(null);
+                }}
+                initialTitle={editingWorkspace?.title || ''}
+                initialDescription={editingWorkspace?.description || ''}
+                initialBook={editingWorkspace?.book || null}
+                workspaceId={editingWorkspace?._id || null}
+              />
+            )}
+
+            <Row>
+              {workspaces.length > 0 ? (
+                workspaces.map((workspace) => (
+                  <Col key={workspace._id} md={4}>
+                    <div onContextMenu={(e) => handleRightClick(e, workspace)}>
+                      <WorkspaceCard
+                        workspace={{ ...workspace, id: workspace._id }}
+                        onDelete={() => confirmDelete(workspace._id)}
+                      />
+                    </div>
+                  </Col>
+                ))
+              ) : (
+                <p>No workspaces yet. Create one!</p>
+              )}
+            </Row>
+          </>
+        ) : (
+          <div className="text-center py-5">
+            <div className="welcome-message" style={{
+              backgroundColor: '#f8f9fa',
+              padding: '2rem',
+              borderRadius: '10px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              maxWidth: '600px',
+              margin: '0 auto'
+            }}>
+              <h2 style={{ color: '#343a40', marginBottom: '1rem' }}>
+                Welcome to Flashcard Revisions
+              </h2>
+              <p style={{ color: '#6c757d', fontSize: '1.1rem' }}>
+                Please login or register to get started with your learning journey
+              </p>
+            </div>
+          </div>
         )}
-
-        <Row>
-          {workspaces.length > 0 ? (
-            workspaces.map((workspace) => (
-              <Col key={workspace._id} md={4}>
-                <div onContextMenu={(e) => handleRightClick(e, workspace)}>
-                  <WorkspaceCard
-                    workspace={{ ...workspace, id: workspace._id }}
-                    onDelete={() => confirmDelete(workspace._id)}
-                  />
-                </div>
-              </Col>
-            ))
-          ) : (
-            <p>No workspaces yet. Create one!</p>
-          )}
-        </Row>
       </Container>
 
       <Modal show={workspaceToDelete !== null} onHide={() => setWorkspaceToDelete(null)} centered>

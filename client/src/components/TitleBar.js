@@ -36,7 +36,7 @@ const TitleBar = ({ title, onAddWorkspace, onBack, onAddFlashcard }) => {
 
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  const [showLogout, setShowLogout] = useState(false);  // Added for logout confirmation
+  const [showLogout, setShowLogout] = useState(false);
 
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [registerData, setRegisterData] = useState({ name: '', email: '', password: '' });
@@ -46,175 +46,185 @@ const TitleBar = ({ title, onAddWorkspace, onBack, onAddFlashcard }) => {
     const storedUser = localStorage.getItem('user');
     return storedToken && storedUser ? JSON.parse(storedUser) : null;
   });
-// Success modal states
-const [showLoginSuccess, setShowLoginSuccess] = useState(false);
-const [showRegisterSuccess, setShowRegisterSuccess] = useState(false);
 
-// Error modal states
-const [showLoginError, setShowLoginError] = useState(false);
-const [showRegisterError, setShowRegisterError] = useState(false);
+  // Success modal states
+  const [showLoginSuccess, setShowLoginSuccess] = useState(false);
+  const [showRegisterSuccess, setShowRegisterSuccess] = useState(false);
 
-const [showLogoutSuccess, setShowLogoutSuccess] = useState(false);
+  // Error modal states
+  const [showLoginError, setShowLoginError] = useState(false);
+  const [showRegisterError, setShowRegisterError] = useState(false);
 
-const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  const [showLogoutSuccess, setShowLogoutSuccess] = useState(false);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
 
-useEffect(() => {
-  if (showLoginSuccess) {
-    const timer = setTimeout(() => setShowLoginSuccess(false), 1000);
-    return () => clearTimeout(timer);
-  }
-}, [showLoginSuccess]);
-
-useEffect(() => {
-  if (showRegisterSuccess) {
-    const timer = setTimeout(() => setShowRegisterSuccess(false), 1000);
-    return () => clearTimeout(timer);
-  }
-}, [showRegisterSuccess]);
-
-useEffect(() => {
-  if (showLoginError) {
-    const timer = setTimeout(() => setShowLoginError(false), 1000);
-    return () => clearTimeout(timer);
-  }
-}, [showLoginError]);
-
-useEffect(() => {
-  if (showRegisterError) {
-    const timer = setTimeout(() => setShowRegisterError(false), 1500);
-    return () => clearTimeout(timer);
-  }
-}, [showRegisterError]);
-
-useEffect(() => {
-  if (showLogoutSuccess) {
-    const timer = setTimeout(() => setShowLogoutSuccess(false), 1000);
-    return () => clearTimeout(timer);
-  }
-}, [showLogoutSuccess]);
-
-useEffect(() => {
-  if (showDeleteSuccess) {
-    const timer = setTimeout(() => {
-      setShowDeleteSuccess(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }
-}, [showDeleteSuccess]);
-
-
-const handleLogin = async (e) => {
-  e.preventDefault();
-  try {
-    const res = await axios.post('/api/auth/login', loginData);
-    localStorage.setItem('token', res.data.token);
-    localStorage.setItem('user', JSON.stringify(res.data.user));
-    setUser(res.data.user); // 👈 Update local state
-    setShowLogin(false);
-    setShowLoginSuccess(true); // Show login success modal
-  } catch (err) {
-    setShowLoginError(true); // Show login error modal
-  }
-};
-
-const handleLogout = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  setUser(null);
-  setShowLogout(false);
-  setShowLogoutSuccess(true); // Show logout success modal
-};
-
-const handleRegister = async (e) => {
-  e.preventDefault();
-  try {
-    await axios.post('/api/auth/register', registerData);
-    setShowRegister(false);
-    setShowRegisterSuccess(true); // Show registration success modal
-  } catch (err) {
-    setShowRegisterError(true); // Show registration error modal
-  }
-};
-
-const handleDeleteAccount = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.error('No token found');
-      alert('You must be logged in to delete your account');
-      return;
+  useEffect(() => {
+    if (showLoginSuccess) {
+      const timer = setTimeout(() => setShowLoginSuccess(false), 1000);
+      return () => clearTimeout(timer);
     }
+  }, [showLoginSuccess]);
 
-    // First verify the token is still valid
+  useEffect(() => {
+    if (showRegisterSuccess) {
+      const timer = setTimeout(() => setShowRegisterSuccess(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [showRegisterSuccess]);
+
+  useEffect(() => {
+    if (showLoginError) {
+      const timer = setTimeout(() => setShowLoginError(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [showLoginError]);
+
+  useEffect(() => {
+    if (showRegisterError) {
+      const timer = setTimeout(() => setShowRegisterError(false), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [showRegisterError]);
+
+  useEffect(() => {
+    if (showLogoutSuccess) {
+      const timer = setTimeout(() => setShowLogoutSuccess(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [showLogoutSuccess]);
+
+  useEffect(() => {
+    if (showDeleteSuccess) {
+      const timer = setTimeout(() => {
+        setShowDeleteSuccess(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [showDeleteSuccess]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
     try {
-      await axios.get('/api/auth/verify', {
+      const res = await axios.post('/api/auth/login', loginData);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      setUser(res.data.user);
+      setShowLogin(false);
+      setShowLoginSuccess(true);
+      
+      // Force a page reload to ensure workspaces are loaded
+      window.location.reload();
+    } catch (err) {
+      setShowLoginError(true);
+    }
+  };
+
+  const handleLogout = () => {
+    // Clear all local storage
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    // Clear user state
+    setUser(null);
+    
+    // Close the profile modal
+    setShowLogout(false);
+    
+    // Show logout success message
+    setShowLogoutSuccess(true);
+    
+    // Force a page reload to clear all state
+    window.location.href = '/';
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post('/api/auth/register', registerData);
+      setShowRegister(false);
+      setShowRegisterSuccess(true); // Show registration success modal
+    } catch (err) {
+      setShowRegisterError(true); // Show registration error modal
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No token found');
+        alert('You must be logged in to delete your account');
+        return;
+      }
+
+      // First verify the token is still valid
+      try {
+        await axios.get('/api/auth/verify', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+      } catch (verifyError) {
+        if (verifyError.response && verifyError.response.status === 403) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          alert('Your session has expired. Please log in again.');
+          return;
+        }
+      }
+
+      const response = await axios.delete('/api/auth/delete', {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
-    } catch (verifyError) {
-      if (verifyError.response && verifyError.response.status === 403) {
+
+      if (response.status === 200) {
+        // Clear localStorage and state
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         setUser(null);
-        alert('Your session has expired. Please log in again.');
-        return;
+        setShowLogout(false);
+        setShowDeleteConfirm(false);
+        setShowDeleteSuccess(true);
+
+        // Navigate to home page after a short delay
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
       }
-    }
-
-    const response = await axios.delete('/api/auth/delete', {
-      headers: {
-        Authorization: `Bearer ${token}`
+    } catch (err) {
+      console.error('Account deletion failed:', err);
+      let errorMessage = 'Failed to delete account. ';
+      
+      if (err.response) {
+        switch (err.response.status) {
+          case 401:
+            errorMessage += 'You are not authorized. Please log in again.';
+            break;
+          case 403:
+            errorMessage += 'Your session has expired. Please log in again.';
+            // Clear user data on token expiration
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+            break;
+          case 404:
+            errorMessage += 'Account not found.';
+            break;
+          default:
+            errorMessage += 'Please try again.';
+        }
+      } else {
+        errorMessage += 'Please check your internet connection and try again.';
       }
-    });
-
-    if (response.status === 200) {
-      // Clear localStorage and state
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
-      setShowLogout(false);
-      setShowDeleteConfirm(false);
-      setShowDeleteSuccess(true);
-
-      // Navigate to home page after a short delay
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 2000);
+      
+      alert(errorMessage);
     }
-  } catch (err) {
-    console.error('Account deletion failed:', err);
-    let errorMessage = 'Failed to delete account. ';
-    
-    if (err.response) {
-      switch (err.response.status) {
-        case 401:
-          errorMessage += 'You are not authorized. Please log in again.';
-          break;
-        case 403:
-          errorMessage += 'Your session has expired. Please log in again.';
-          // Clear user data on token expiration
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setUser(null);
-          break;
-        case 404:
-          errorMessage += 'Account not found.';
-          break;
-        default:
-          errorMessage += 'Please try again.';
-      }
-    } else {
-      errorMessage += 'Please check your internet connection and try again.';
-    }
-    
-    alert(errorMessage);
-  }
-};
-
-
+  };
 
   return (
     <>
@@ -255,8 +265,8 @@ const handleDeleteAccount = async () => {
         </Container>
       </Navbar>
 
- {/* Login Success Modal */}
- <Modal show={showLoginSuccess} onHide={() => setShowLoginSuccess(false)}>
+      {/* Login Success Modal */}
+      <Modal show={showLoginSuccess} onHide={() => setShowLoginSuccess(false)}>
         <Modal.Header closeButton>
           <Modal.Title>Login Successful</Modal.Title>
         </Modal.Header>
@@ -307,46 +317,46 @@ const handleDeleteAccount = async () => {
         </Modal.Footer>
       </Modal>
 
-{/* Logout Success Modal */}
-<Modal show={showLogoutSuccess} onHide={() => setShowLogoutSuccess(false)}>
-  <Modal.Header closeButton>
-    <Modal.Title>Logged Out</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <p>You have been successfully logged out.</p>
-  </Modal.Body>
-  <Modal.Footer>
-    
-  </Modal.Footer>
-</Modal>
+      {/* Logout Success Modal */}
+      <Modal show={showLogoutSuccess} onHide={() => setShowLogoutSuccess(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Logged Out</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>You have been successfully logged out.</p>
+        </Modal.Body>
+        <Modal.Footer>
+          
+        </Modal.Footer>
+      </Modal>
 
-<Modal show={showDeleteConfirm} onHide={() => setShowDeleteConfirm(false)}>
-  <Modal.Header closeButton>
-    <Modal.Title>Confirm Deletion</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <p>Are you absolutely sure you want to delete your account?</p>
-    <p>This action <strong>cannot be undone</strong>.</p>
-  </Modal.Body>
-  <Modal.Footer>
-    <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
-      Cancel
-    </Button>
-      <Button variant="danger" onClick={() => {
-  handleDeleteAccount(); 
-}}>
-      Yes, Delete
-    </Button>
-  </Modal.Footer>
-</Modal>
+      <Modal show={showDeleteConfirm} onHide={() => setShowDeleteConfirm(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Deletion</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Are you absolutely sure you want to delete your account?</p>
+          <p>This action <strong>cannot be undone</strong>.</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={() => {
+            handleDeleteAccount(); 
+          }}>
+            Yes, Delete
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
-{/*Delete success modal*/}
-<Modal show={showDeleteSuccess} onHide={() => setShowDeleteSuccess(false)} backdrop="static" keyboard={false}>
-  <Modal.Header>
-    <Modal.Title>Account Deleted</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>Your account has been permanently deleted.</Modal.Body>
-</Modal>
+      {/*Delete success modal*/}
+      <Modal show={showDeleteSuccess} onHide={() => setShowDeleteSuccess(false)} backdrop="static" keyboard={false}>
+        <Modal.Header>
+          <Modal.Title>Account Deleted</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>Your account has been permanently deleted.</Modal.Body>
+      </Modal>
 
       {/* Login Modal */}
       <Modal show={showLogin} onHide={() => setShowLogin(false)}>
@@ -413,34 +423,32 @@ const handleDeleteAccount = async () => {
 
       {/* Logout Confirmation Modal */}
       <Modal show={showLogout} onHide={() => setShowLogout(false)}>
-  <Modal.Header closeButton>
-    <Modal.Title>Profile</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <p><strong>Name:</strong> {user ? user.name : ''}</p>
-    <p><strong>Email:</strong> {user ? user.email : ''}</p>
-  </Modal.Body>
-  <Modal.Footer className="d-flex justify-content-between flex-wrap">
-    <div className="d-flex gap-2">
-    <Button 
-  variant="danger" 
-  onClick={() => { 
-    setShowDeleteConfirm(true); 
-  }}
->
-  Delete Account
-</Button>
-      <Button variant="warning" onClick={handleLogout}>
-        Logout
-      </Button>
-    </div>
-    <Button variant="secondary" onClick={() => setShowLogout(false)}>
-      Cancel
-    </Button>
-  </Modal.Footer>
-</Modal>
-
-
+        <Modal.Header closeButton>
+          <Modal.Title>Profile</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p><strong>Name:</strong> {user ? user.name : ''}</p>
+          <p><strong>Email:</strong> {user ? user.email : ''}</p>
+        </Modal.Body>
+        <Modal.Footer className="d-flex justify-content-between flex-wrap">
+          <div className="d-flex gap-2">
+            <Button 
+              variant="danger" 
+              onClick={() => { 
+                setShowDeleteConfirm(true); 
+              }}
+            >
+              Delete Account
+            </Button>
+            <Button variant="warning" onClick={handleLogout}>
+              Logout
+            </Button>
+          </div>
+          <Button variant="secondary" onClick={() => setShowLogout(false)}>
+            Cancel
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   );
 };

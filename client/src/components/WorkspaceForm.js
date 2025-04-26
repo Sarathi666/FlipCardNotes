@@ -6,51 +6,86 @@ const WorkspaceForm = ({
   onClose,
   initialTitle = '',
   initialDescription = '',
-  initialBook = null, // NEW: add support for file preview
+  initialBook = null,
   workspaceId = null
 }) => {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
-  const [book, setBook] = useState(initialBook); // NEW
+  const [book, setBook] = useState(initialBook);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
   const titleRef = useRef(null);
 
   useEffect(() => {
     setTitle(initialTitle);
     setDescription(initialDescription);
-    setBook(initialBook); // NEW
+    setBook(initialBook);
     if (titleRef.current) {
       titleRef.current.focus();
     }
   }, [initialTitle, initialDescription, initialBook]);
 
-
- 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!title.trim() || !description.trim()) return;
 
-    if (title.trim() && description.trim()) {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
       const workspaceData = {
         id: workspaceId || Date.now(),
-        title,
-        description,
-        book, // NEW: save the file
-        cards: workspaceId ? undefined : []
+        title: title.trim(),
+        description: description.trim(),
+        book: book ? {
+          name: book.name,
+          url: book.url
+        } : null
       };
 
-      onSave(workspaceData);
+      await onSave(workspaceData);
       onClose();
+    } catch (error) {
+      console.error('Error saving workspace:', error);
+      setError('Failed to save workspace. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleBookUpload = (e) => { // NEW
+  const handleBookUpload = (e) => {
     const file = e.target.files[0];
-    if (file && file.type === 'application/pdf') {
-      const fileURL = URL.createObjectURL(file);
-      file.url = fileURL; // attach preview URL for local use
-      setBook(file);
-    } else {
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
       alert('Please upload a valid PDF file.');
+      return;
     }
+
+    // Check file size (limit to 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size should be less than 10MB.');
+      return;
+    }
+
+    try {
+      const fileURL = URL.createObjectURL(file);
+      setBook({
+        name: file.name,
+        url: fileURL,
+        file: file
+      });
+    } catch (error) {
+      console.error('Error processing file:', error);
+      alert('Error processing file. Please try again.');
+    }
+  };
+
+  const handleClearBook = () => {
+    if (book?.url) {
+      URL.revokeObjectURL(book.url);
+    }
+    setBook(null);
   };
 
   return (
@@ -60,6 +95,12 @@ const WorkspaceForm = ({
       </Modal.Header>
 
       <Modal.Body>
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            {error}
+          </div>
+        )}
+
         <Form onSubmit={handleSubmit}>
           <Form.Group className="mb-3">
             <Form.Label>Workspace Title</Form.Label>
@@ -83,53 +124,56 @@ const WorkspaceForm = ({
               required
             />
           </Form.Group>
+
           <Form.Group className="mb-3">
-  <Form.Label>Upload Book (PDF)</Form.Label>
-  <div className="d-flex align-items-center gap-2">
-    <Form.Control
-      type="file"
-      accept="application/pdf"
-      onChange={handleBookUpload}
-      style={{ maxWidth: '75%' }}
-    />
-    {book && (
-      <Button
-        variant="outline-danger"
-        size="sm"
-        onClick={() => setBook(null)}
-        title="Clear File"
-      >
-        Clear
-      </Button>
-    )}
-  </div>
+            <Form.Label>Upload Book (PDF)</Form.Label>
+            <div className="d-flex align-items-center gap-2">
+              <Form.Control
+                type="file"
+                accept="application/pdf"
+                onChange={handleBookUpload}
+                style={{ maxWidth: '75%' }}
+              />
+              {book && (
+                <Button
+                  variant="outline-danger"
+                  size="sm"
+                  onClick={handleClearBook}
+                  title="Clear File"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
 
-  {/* Uploaded File Name */}
-  {book && book.name && (
-    <small className="text-success d-block mt-1">
-      PDF Uploaded: {book.name}
-    </small>
-  )}
+            {book && book.name && (
+              <small className="text-success d-block mt-1">
+                PDF Uploaded: {book.name}
+              </small>
+            )}
 
-  {/* PDF Preview */}
-  {book?.url && (
-    <div className="mt-2">
-      <iframe
-        src={book.url}
-        width="100%"
-        height="200px"
-        title="PDF Preview"
-        style={{ border: '1px solid #ccc', borderRadius: '4px' }}
-      />
-    </div>
-  )}
-</Form.Group>
+            {book?.url && (
+              <div className="mt-2">
+                <iframe
+                  src={book.url}
+                  width="100%"
+                  height="200px"
+                  title="PDF Preview"
+                  style={{ border: '1px solid #ccc', borderRadius: '4px' }}
+                />
+              </div>
+            )}
+          </Form.Group>
 
-
-          <Form.Control type="submit" hidden />
-          <Button variant="primary" type="submit">
-            {workspaceId ? 'Save Changes' : 'Create'}
-          </Button>
+          <div className="d-flex justify-content-end">
+            <Button 
+              variant="primary" 
+              type="submit" 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Saving...' : (workspaceId ? 'Save Changes' : 'Create')}
+            </Button>
+          </div>
         </Form>
       </Modal.Body>
     </Modal>
